@@ -1,0 +1,22 @@
+{
+  "name": "@distill/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "actario": "./bin/actario.js"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@distill/adapters": "*",
+    "@distill/capture": "*",
+    "@distill/daf": "*",
+    "@distill/export": "*",
+    "@distill/redaction": "*",
+    "@distill/shared": "*",
+    "@distill/ucf": "*",
+    "@modelcontextprotocol/sdk": "^1.30.0"
+  }
+}

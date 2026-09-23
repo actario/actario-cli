@@ -1,0 +1,94 @@
+{
+  "agents": [],
+  "runs": [
+    {
+      "run_ref": "c0ffee00-0000-4000-8000-000000000002",
+      "agent_ref": null,
+      "platform": "chatgpt",
+      "model": "gpt-5",
+      "started_at": "2026-08-28T06:53:20.000Z",
+      "ended_at": "2026-08-28T07:53:20.000Z",
+      "outcome": null,
+      "title": "Ultrasound QA sampling plan",
+      "binding_hints": [
+        {
+          "type": "conversation_id",
+          "value": "c0ffee00-0000-4000-8000-000000000002"
+        }
+      ],
+      "turns": [
+        {
+          "idx": 0,
+          "role": "user",
+          "content": "How many probes per lot should we sample for the QA gate?",
+          "timestamp": "2026-08-28T06:53:30.000Z",
+          "tool_calls": null,
+          "branch_id": null,
+          "parent_turn_ref": null,
+          "truncated": false,
+          "tool_result": null,
+          "result_truncated": false,
+          "raw_ext": {
+            "metadata": {
+              "request_id": "r1"
+            }
+          }
+        },
+        {
+          "idx": 1,
+          "role": "assistant",
+          "content": "For a lot of 500, a sample of 32 gives you 95% confidence at AQL 1.0.",
+          "timestamp": "2026-08-28T06:54:00.000Z",
+          "tool_calls": null,
+          "branch_id": null,
+          "parent_turn_ref": 0,
+          "truncated": false,
+          "tool_result": null,
+          "result_truncated": false,
+          "raw_ext": {}
+        },
+        {
+          "idx": 2,
+          "role": "user",
+          "content": "Use 32. Decision made, put it in the QA doc.",
+          "timestamp": "2026-08-28T06:54:50.000Z",
+          "tool_calls": null,
+          "branch_id": null,
+          "parent_turn_ref": 1,
+          "truncated": false,
+          "tool_result": null,
+          "result_truncated": false,
+          "raw_ext": {}
+        },
+        {
+          "idx": 3,
+          "role": "assistant",
+          "content": "Regenerated answer: sample 50 if the lot is mixed-vendor.",
+          "timestamp": "2026-08-28T06:54:10.000Z",
+          "tool_calls": null,
+          "branch_id": "n2b",
+          "parent_turn_ref": 0,
+          "truncated": false,
+          "tool_result": null,
+          "result_truncated": false,
+          "raw_ext": {}
+        }
+      ],
+      "artifacts": [],
+      "parse_level": "strict",
+      "adapter_id": "chatgpt_export",
+      "adapter_version": "2026-01",
+      "degraded_fields": [],
+      "absent_by_capability": [
+        "tool_calls",
+        "artifacts",
+        "outcome"
+      ],
+      "raw_ext": {
+        "some_new_field_openai_added": {
+          "experiment": "abc"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+SECRET:xox{{}}b-2401234567-2409876543210-AbCdEfGhIjKlMnOpQrStUvWx
+SECRET:sk_{{}}live_51H8xKqLmNoPqRsTuVwXyZ0123
+SECRET:AIza{{}}SyFAKE0fake0FAKE0fake0FAKE0fake0000
+---
+slack bot: xox{{}}b-2401234567-2409876543210-AbCdEfGhIjKlMnOpQrStUvWx
+stripe: sk_{{}}live_51H8xKqLmNoPqRsTuVwXyZ0123
+maps: AIza{{}}SyFAKE0fake0FAKE0fake0FAKE0fake0000

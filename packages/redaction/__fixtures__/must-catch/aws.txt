@@ -1,0 +1,9 @@
+SECRET:AKIAIOSFODNN7EXAMPLE
+SECRET:wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+---
+I set up the uploader with these, can you check the region?
+
+export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+export aws_secret_access_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+It keeps returning SignatureDoesNotMatch on us-west-2.

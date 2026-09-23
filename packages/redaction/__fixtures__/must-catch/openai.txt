@@ -1,0 +1,3 @@
+SECRET:sk-proj-7fKq2mWx9LzR4tNb8vYc1HdG5sJa3EoP6iUy
+---
+The embedding call fails with 401. Key: sk-proj-7fKq2mWx9LzR4tNb8vYc1HdG5sJa3EoP6iUy

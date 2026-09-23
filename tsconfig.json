@@ -1,0 +1,41 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@distill/adapters": [
+        "packages/adapters/src/index.ts"
+      ],
+      "@distill/capture": [
+        "packages/capture/src/index.ts"
+      ],
+      "@distill/daf": [
+        "packages/daf/src/index.ts"
+      ],
+      "@distill/export": [
+        "packages/export/src/index.ts"
+      ],
+      "@distill/redaction": [
+        "packages/redaction/src/index.ts"
+      ],
+      "@distill/shared": [
+        "packages/shared/src/index.ts"
+      ],
+      "@distill/ucf": [
+        "packages/ucf/src/index.ts"
+      ],
+      "@distill/shared/*": [
+        "packages/shared/src/*"
+      ]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*.ts",
+    "apps/*/src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/node_modules",
+    "**/dist"
+  ]
+}

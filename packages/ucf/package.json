@@ -1,0 +1,9 @@
+{
+  "name": "@distill/ucf",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "gen:jsonschema": "node --import tsx src/export-json-schema.ts" },
+  "dependencies": { "zod": "^3.24.1", "zod-to-json-schema": "^3.24.1" }
+}

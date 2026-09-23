@@ -1,0 +1,56 @@
+{
+  "daf_version": "0.2",
+  "bundle_id": "9b2f7c1e-3d4a-4f6b-8c9d-0e1f2a3b4c5d",
+  "analyzer": {
+    "kind": "agent_session",
+    "model": "claude-sonnet-4-5",
+    "skill_version": "1.1.0",
+    "prompt_version": "client-extract@2026-09-15",
+    "produced_at": "2026-09-11T14:20:00+08:00"
+  },
+  "segments": [
+    { "run_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "run_ref": "cc-session-0001",
+      "start_turn_idx": 0, "end_turn_idx": 24,
+      "topic": "rewrite the clean pipeline", "summary": "Moved the cleaning step to a streaming writer; settled the evaluation split.", "labels": ["pipeline", "eval"] }
+  ],
+  "entries": [
+    { "type": "decision", "title": "Evaluation switched to LOPO",
+      "body": "Leave-one-participant-out replaces k-fold: k-fold leaked subject identity across folds and inflated the score.",
+      "confidence": 0.86, "occurred_at": "2026-08-27T16:10:00+08:00",
+      "run_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "run_ref": "cc-session-0001",
+      "source_turn_idx": [12, 13, 14],
+      "rejected_options": ["k-fold -- leaks across subjects", "random 80/20 -- same leak, less obvious"],
+      "entities": ["component:eval-harness"] },
+    { "type": "action", "title": "Re-run the baseline under LOPO",
+      "body": "Owner: Jacky. Blocked until clean_v3 finishes.",
+      "confidence": 0.7, "occurred_at": null,
+      "run_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "source_turn_idx": [20] },
+    { "type": "fact", "title": "Anchors point at a turn that does not exist",
+      "body": "This entry is here to be dropped by the resolver: idx 999 is not a turn of the run.",
+      "confidence": 0.9,
+      "run_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "source_turn_idx": [3, 999] },
+    { "type": "risk", "title": "Run hash no server has ever seen",
+      "body": "Dropped: the run_hash matches no run of the workspace.",
+      "confidence": 0.5,
+      "run_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "source_turn_idx": [0] },
+    { "type": "opinion", "title": "Not one of the six types",
+      "body": "Dropped per item (rule 6), not the whole batch (rule 1).",
+      "confidence": 1.4,
+      "run_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "source_turn_idx": [1] }
+  ],
+  "agent_states": [
+    { "agent_ref": "agent:b1",
+      "doing_now": "clean_v3.py rewrite finished, last run passed; LOPO baseline not yet re-run",
+      "last_action": { "summary": "ran the clean_v3 smoke test", "at": "2026-08-27T16:40:00+08:00" },
+      "blockers": ["whether v3 keeps the v2 fallback branch"],
+      "recent_artifacts": ["clean_v3.py", "schema_notes.md"],
+      "confidence": "high",
+      "source_run_hashes": ["a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90"] }
+  ]
+}

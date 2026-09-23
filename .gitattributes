@@ -1,0 +1,10 @@
+# Store LF in the repo and check out LF everywhere: this tree is edited from
+# Windows and from Linux sandboxes in turn, and CRLF flip-flops would make
+# every sync a whole-file diff. Node, Next and PowerShell are all fine with LF.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.pptx binary
+*.docx binary
+*.zip binary
+*.tgz binary

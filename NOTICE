@@ -1,0 +1,9 @@
+Actario CLI
+Copyright 2026 Jacky Li
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+This repository is a read-only mirror of the Actario command-line client and
+the seven workspace packages it is built from. It is generated from a private
+monorepo; the Actario web application, worker, database schema and corpus
+admission logic are not part of it and are not licensed here.

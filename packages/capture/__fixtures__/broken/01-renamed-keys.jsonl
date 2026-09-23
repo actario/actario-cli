@@ -1,0 +1,3 @@
+{"kind":"turn","speaker":"human","body":"did the migration run clean on staging?","sent_at":"2026-08-30T02:10:00Z","trace":"x1"}
+{"kind":"turn","speaker":"model","body":"Yes -- 14 statements, no errors. RLS suite green.","sent_at":"2026-08-30T02:10:41Z","trace":"x2","cost_usd":0.0031}
+{"kind":"turn","speaker":"human","body":"good, then we can cut the release","sent_at":"2026-08-30T02:11:20Z"}

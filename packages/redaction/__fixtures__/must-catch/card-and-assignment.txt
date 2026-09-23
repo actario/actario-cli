@@ -1,0 +1,5 @@
+SECRET:4111111111111111
+SECRET:hunter2-not-a-real-password
+---
+Test card 4111111111111111 keeps declining.
+Also the staging box still has password: hunter2-not-a-real-password
