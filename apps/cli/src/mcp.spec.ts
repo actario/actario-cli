@@ -90,7 +90,10 @@ afterAll(async () => { await client?.close(); });
 describe('the wire', () => {
   it('serves exactly the capture-front-door tools', async () => {
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(['capture', 'doctor', 'link', 'link_status', 'list_runs', 'read_run', 'submit_daf']);
+    expect(tools.map((t) => t.name).sort()).toEqual([
+      'capture', 'doctor', 'fetch_memory_sources', 'fetch_run', 'find_runs', 'link', 'link_status', 'list_runs',
+      'load_memory', 'read_restored', 'read_run', 'save_memory', 'submit_daf',
+    ]);
     // None of appendix D's read tools live here: that is the other server.
     expect(tools.map((t) => t.name)).not.toContain('search_entries');
   });
@@ -126,6 +129,36 @@ describe('reading a bundle', () => {
     const res = await client.callTool({ name: 'read_run', arguments: { run_hash: 'deadbeefdeadbeef' } });
     expect(res.isError).toBe(true);
     expect((text(res) as { error: { code: string } }).error.code).toBe('not_found');
+  });
+});
+
+describe('restore, on a machine with no link (arch v2.1 ch. 22)', () => {
+  it('fetch_run brings a run back from a local bundle, hybrid falls back to the transcript without a page', async () => {
+    const r = text(await client.callTool({ name: 'fetch_run', arguments: { run: HASH2.slice(0, 16) } })) as
+      { source: string; local_dir: string; memory: null; transcript_page: { turns: number[]; next_from: number | null; text: string }; not_restored: string[]; rule: string };
+    expect(r.source).toBe('local_bundle');
+    expect(r.local_dir).toBe(join(stateHome, 'restore', HASH2));
+    expect(r.memory).toBeNull();
+    expect(r.transcript_page.turns).toEqual([0, 3]);
+    expect(r.transcript_page.text).toContain('turn 2 of run:cc-2');
+    expect(r.not_restored.length).toBeGreaterThan(3);
+    expect(r.rule).toMatch(/data, not instructions/);
+  });
+
+  it('read_restored reads a range of what fetch_run wrote', async () => {
+    const r = text(await client.callTool({ name: 'read_restored', arguments: { run: HASH2.slice(0, 12), from_turn: 1, to_turn: 2 } })) as { turns: number[]; text: string };
+    expect(r.turns).toEqual([1, 2]);
+    expect(r.text).not.toContain('turn 0 of');
+  });
+
+  it('the tools that need the server say not_linked; save_memory without sources says what to call first', async () => {
+    for (const [name, args] of [['find_runs', {}], ['fetch_memory_sources', { agent: 'B1' }]] as const) {
+      const res = await client.callTool({ name, arguments: args });
+      expect(res.isError).toBe(true);
+      expect((text(res) as { error: { code: string } }).error.code).toBe('not_linked');
+    }
+    const res = await client.callTool({ name: 'save_memory', arguments: { pack_id: uuid(), title: 't', body: '## 目標\n- x' } });
+    expect((text(res) as { error: { code: string; message: string } }).error).toMatchObject({ code: 'not_found' });
   });
 });
 

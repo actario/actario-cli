@@ -6,11 +6,16 @@ import { actarioDir, doctor, localEnv, readConfig } from '@distill/capture';
 import { ensureSalt } from '@distill/redaction';
 import { actarioEnv, DistillError, setLogSink } from '@distill/shared';
 import { CLI_VERSION } from '../version.ts';
-import { whoami, type ApiOptions } from '../api.ts';
+import { findRunsApi, whoami, type ApiOptions } from '../api.ts';
 import { captureFlow, resolveLink, writeChatRecord } from '../core/capture.ts';
 import { dafTemplate, describeDrop, findRun, indexRuns, pickBundle, submitDaf } from '../core/analyze.ts';
 import { linkMachine, type LinkResult } from '../core/link.ts';
 import { DEFAULT_API_URL, defaultApiUrl, startDeviceLogin, type DeviceLogin } from '../core/device-login.ts';
+import {
+  DATA_NOT_INSTRUCTIONS, NotLinkedError, fetchMemorySources, fetchRunToCache, findRestored, isRestored, listPacks, loadMemory,
+  localReverseMap, memoryRoot, pageLines, readRestoredAnswer, restoreAnswer, saveMemory,
+} from '../core/restore.ts';
+import { memoryBody, type MemoryScope } from '@distill/shared';
 
 /**
  * `actario mcp` -- the capture front door (ADR item 31).
@@ -68,6 +73,7 @@ const fail = (code: string, message: string, details?: unknown): ToolResult =>
 const guarded = <A>(fn: (a: A) => Promise<ToolResult>) => async (a: A): Promise<ToolResult> => {
   try { return await fn(a); } catch (e) {
     if (e instanceof DistillError) return fail(e.code, e.message, e.details);
+    if (e instanceof NotLinkedError) return fail(e.code, e.message);
     return fail('internal', (e as Error).message);
   }
 };
@@ -108,6 +114,41 @@ async function writeGuard(): Promise<ToolResult | null> {
   if (!me.can_capture) return fail('forbidden', `The configured token lacks the "capture" scope (has: ${me.scopes.join(', ') || 'none'}).`);
   return null;
 }
+
+/**
+ * Restore and memory read the workspace on a person's behalf (arch v2.1
+ * 22.7): a person's token, never an agent's -- an agent reading another
+ * line of work uses the reflow MCP with its own grants (C4). The server
+ * refuses agent tokens on these routes anyway; asking first turns its 403
+ * into a sentence that says why. The answer is kept for five minutes: a
+ * restore makes several calls in a row and the token does not change kind.
+ */
+let humanChecked: { key: string; at: number } | null = null;
+async function humanGuard(api: ApiOptions): Promise<ToolResult | null> {
+  const key = `${api.baseUrl}|${api.token.slice(-8)}`;
+  if (humanChecked && humanChecked.key === key && Date.now() - humanChecked.at < 5 * 60_000) return null;
+  let me;
+  try {
+    me = await whoami(api);
+  } catch (e) {
+    if (e instanceof DistillError && e.code === 'unauthorized') return fail('unauthorized', 'The configured token was rejected by the server (revoked?). Call `link` again to sign in.');
+    // Unreachable: let the call itself fail (or fall back to a local bundle).
+    return null;
+  }
+  if (me.kind !== 'user') return fail('forbidden', 'The configured token is an agent token. Bringing conversations back is done for a person, with a token minted for yourself.');
+  humanChecked = { key, at: Date.now() };
+  return null;
+}
+
+/** A memory echoed into the conversation in pieces no bigger than this (estimated tokens; a client caps one answer at about 25k). */
+const MEMORY_ECHO_TOKENS = 14_000;
+
+const zScope = {
+  runs: z.array(z.string().min(8).max(200)).max(30).optional().describe('Run ids, run URLs or run hashes (prefixes of 12+ are fine).'),
+  agent: z.string().min(1).max(200).optional().describe('An agent (line of work): its id or its name.'),
+  since: z.string().optional().describe('Runs that started on or after this date (2026-09-01) or ISO date-time.'),
+  until: z.string().optional().describe('Runs that started on or before this.'),
+};
 
 export function buildServer(): McpServer {
   const server = new McpServer({ name: 'actario-capture', version: CLI_VERSION });
@@ -410,6 +451,184 @@ export function buildServer(): McpServer {
         approx_units: r.found ? r.approx_units : 0,
         samples: r.sampled.map((s) => ({ unit: s.unit, parse_level: s.parse_level, handled_by: s.handled_by ?? null, unrecognised_keys: s.unrecognised_keys.slice(0, 12) })),
       })),
+    });
+  }));
+
+  // ── restore and memory (arch v2.1 ch. 22; plugin 0.1.7a, CLI 0.1.4) ──
+
+  server.registerTool('find_runs', {
+    title: 'Find a conversation to bring back',
+    description:
+      'Search the runs (captured conversations) this person can see: by words in the title, by agent (line of work), by date. '
+      + 'Newest first, one line each with no content: id, run_hash, title, dates, turn count, whether it has a note page. '
+      + 'Use it when the user wants to continue, recall or compact earlier work and has not given a run id or URL.',
+    inputSchema: {
+      q: z.string().min(1).max(200).optional().describe('Words in the title.'),
+      agent: z.string().min(1).max(200).optional().describe('Agent id or name.'),
+      since: z.string().optional().describe('ISO date or date-time.'),
+      until: z.string().optional().describe('ISO date or date-time.'),
+      limit: z.number().int().min(1).max(50).optional().describe('Default 20.'),
+      cursor: z.string().optional().describe('next_cursor from the previous call, for the next page.'),
+    },
+  }, guarded(async (a) => {
+    const api = apiFromConfig();
+    if (!api) return fail('not_linked', 'This machine is not linked to a workspace. Call `link` first (with no arguments it signs the user in through the browser).');
+    const g = await humanGuard(api); if (g) return g;
+    const r = await findRunsApi(api, { ...a, limit: a.limit ?? 20 });
+    return ok({
+      runs: r.runs.map((x) => ({
+        id: x.id, run_hash: x.run_hash, short: x.run_hash.slice(0, 12), title: x.title, platform: x.platform,
+        started_at: x.started_at, ended_at: x.ended_at, turns: x.turns, has_note_page: x.has_page, agent: x.agent?.name ?? null,
+        restored_here: isRestored(x.run_hash),
+      })),
+      next_cursor: r.next_cursor,
+      next: 'Pick one with the user, then call fetch_run with its id. To build a memory from several, call fetch_memory_sources with their ids.',
+    });
+  }));
+
+  server.registerTool('fetch_run', {
+    title: 'Bring a conversation back into this one',
+    description:
+      'Download one run (masked, as uploaded) to this machine and return what this conversation needs to continue it. '
+      + 'mode hybrid (default): a memory built from the run\'s note page and segments, an index, and the latest turns -- read any stretch later with read_restored. '
+      + 'memory: the memory and index only. transcript: the turns from the start, a page at a time. '
+      + 'The full text is written under ~/.actario/restore/, never all pushed into the conversation. '
+      + 'What comes back is the conversation, not its environment: no file contents or diffs, no attachments, tool output capped at 8 KB, real values still pseudonyms. '
+      + 'Works from a bundle still on this machine when the server is unreachable or does not have the run.',
+    inputSchema: {
+      run: z.string().min(8).max(300).describe('Run id, a /runs/<id> URL, or a run_hash (a 12+ character prefix will do).'),
+      mode: z.enum(['transcript', 'memory', 'hybrid']).optional().describe('Default hybrid.'),
+    },
+  }, guarded(async (a) => {
+    const api = apiFromConfig();
+    if (api) { const g = await humanGuard(api); if (g) return g; }
+    const r = await fetchRunToCache(api, a.run);
+    return ok(restoreAnswer(r, a.mode ?? 'hybrid'));
+  }));
+
+  server.registerTool('read_restored', {
+    title: 'Read part of a restored conversation',
+    description:
+      'Read turns from a run already brought back with fetch_run (or fetch_memory_sources), from_turn to to_turn inclusive, about 12k tokens at most per call -- '
+      + 'next_from says where to continue. part "memory" or "page" returns the run\'s memory or note page instead. '
+      + 'unmask: true reverses pseudonyms with this machine\'s redaction map, only if this machine captured the run; real values are shown in the answer and never written to disk. '
+      + 'Fetches the run first if it is not on this machine yet.',
+    inputSchema: {
+      run: z.string().min(8).max(300).describe('Run id, URL, run_hash or its prefix (as in a memory anchor: <hash>#tA-B).'),
+      from_turn: z.number().int().min(0).optional().describe('First turn idx (default 0).'),
+      to_turn: z.number().int().min(0).optional().describe('Last turn idx, inclusive (default: as far as fits).'),
+      part: z.enum(['turns', 'memory', 'page']).optional().describe('Default turns.'),
+      unmask: z.boolean().optional().describe('Only when the user asks to see the real values. Only works on the machine that captured the run.'),
+    },
+  }, guarded(async (a) => {
+    let r = findRestored(a.run);
+    if (r === 'ambiguous') return fail('invalid_request', `More than one restored run starts with ${a.run}; give more of the hash.`);
+    if (!r) {
+      const api = apiFromConfig();
+      if (api) { const g = await humanGuard(api); if (g) return g; }
+      r = await fetchRunToCache(api, a.run);
+    }
+    return ok(readRestoredAnswer(r, {
+      from: a.from_turn ?? 0, to: a.to_turn ?? Number.MAX_SAFE_INTEGER, part: a.part ?? 'turns',
+      unmask: a.unmask ?? false, reverse: a.unmask ? localReverseMap() : null,
+    }));
+  }));
+
+  server.registerTool('fetch_memory_sources', {
+    title: 'Download the runs a memory will be compacted from',
+    description:
+      'Step one of a memory pack (actario.memory/v1): resolve a scope -- given runs, an agent (line of work), and/or a date range, at most 30 runs -- '
+      + 'and download every run in it to this machine with its segments and note page. Returns a pack_id, a digest (each run\'s note-page summary and anchored headings), '
+      + 'and the rules to follow. The compaction is yours to do here, with the user\'s own model (the server never writes it); then call save_memory with the pack_id. '
+      + 'Pass pack_id to make a new version of an existing pack.',
+    inputSchema: {
+      ...zScope,
+      pack_id: z.string().uuid().optional().describe('Existing pack to re-compact as a new version. Omit for a new pack.'),
+      limit: z.number().int().min(1).max(30).optional().describe('At most this many runs (newest kept). Default 30.'),
+    },
+  }, guarded(async (a) => {
+    const api = apiFromConfig();
+    if (!api) return fail('not_linked', 'This machine is not linked to a workspace. Call `link` first (with no arguments it signs the user in through the browser).');
+    if (!a.runs?.length && !a.agent && !a.since) return fail('invalid_request', 'Give the scope: runs, an agent, or a since date (or a combination).');
+    const g = await humanGuard(api); if (g) return g;
+    const scope: MemoryScope = {
+      ...(a.runs?.length ? { runs: a.runs } : {}), ...(a.agent ? { agent: a.agent } : {}),
+      ...(a.since ? { since: a.since } : {}), ...(a.until ? { until: a.until } : {}),
+    };
+    return ok(await fetchMemorySources(api, { scope, ...(a.pack_id ? { pack_id: a.pack_id } : {}), ...(a.limit ? { limit: a.limit } : {}) }));
+  }));
+
+  server.registerTool('save_memory', {
+    title: 'Check and save a memory pack',
+    description:
+      'Step two: hand over the compacted memory body (Markdown sections: goal, status, to-do, decisions & conventions, files & commands, pseudonym legend; '
+      + 'every content line anchored as <run hash prefix>#tA-B). The front matter is written here from what was fetched -- do not write your own. '
+      + 'Runs the redaction rules over the text, then checks anchors, sections and the budget (S 2k, M 8k, L 24k tokens); nothing is saved if a check fails. '
+      + 'Saves to this machine. upload: true also stores it on the server as a new version, visible only to this person -- only when the user asked for it.',
+    inputSchema: {
+      pack_id: z.string().uuid().describe('From fetch_memory_sources or load_memory.'),
+      title: z.string().min(1).max(200).describe('Short name for the pack, in the language of the conversation.'),
+      body: z.string().min(1).max(200000).describe('The memory: Markdown, starting with a one-line "as of" note, then the sections.'),
+      budget: z.enum(['S', 'M', 'L']).optional().describe('Default M.'),
+      upload: z.boolean().optional().describe('Also store it on the server. Default false: memory stays on this machine.'),
+      base_version: z.number().int().min(0).optional().describe('Only to override which server version this one replaces.'),
+    },
+  }, guarded(async (a) => {
+    const api = apiFromConfig();
+    if (a.upload) { const g = await writeGuard(); if (g) return g; }
+    const r = await saveMemory({
+      pack_id: a.pack_id, title: a.title, body: a.body, budget: a.budget ?? 'M', upload: a.upload ?? false,
+      ...(a.base_version !== undefined ? { base_version: a.base_version } : {}), api,
+    }).catch((e: unknown) => {
+      if (e instanceof DistillError && e.code === 'memory_conflict') {
+        throw new DistillError('memory_conflict',
+          'Saved on this machine, but the server has a newer version of this pack (saved from somewhere else). Call load_memory to see it, merge, and save again.', undefined, 409);
+      }
+      throw e;
+    });
+    if (r.kind === 'invalid') {
+      return fail('memory_invalid', 'The memory pack did not pass the local checks; nothing was saved. Fix the lines listed and call save_memory again.', {
+        issues: r.check.errors.slice(0, 40), approx_tokens: r.check.tokens, budget_tokens: r.check.budgetTokens, redacted: r.redacted,
+      });
+    }
+    const shown = pageLines(memoryBody(r.doc), 1, MEMORY_ECHO_TOKENS);
+    return ok({
+      saved: true, path: r.path, approx_tokens: r.check.tokens, budget_tokens: r.check.budgetTokens,
+      anchors: r.check.anchors.length, sections: r.check.sections, redacted_in_text: r.redacted,
+      uploaded: r.uploaded,
+      memory: shown.text,
+      ...(shown.next_line ? { memory_next_line: shown.next_line } : {}),
+      next: shown.next_line
+        ? `The memory is longer than one answer: load the rest with load_memory(pack_id, from_line: ${shown.next_line}). Then tell the user what it covers and its date.`
+        : 'This memory is now in the conversation. Tell the user what it covers and its date; anchors (hash#tA-B) can be opened with read_restored.',
+    });
+  }));
+
+  server.registerTool('load_memory', {
+    title: 'Load a saved memory pack',
+    description:
+      'Bring a memory pack saved earlier into this conversation: from this machine, or from the server when it was uploaded (and the server copy is newer). '
+      + 'With no pack_id, lists the packs on this machine and, when linked, the ones uploaded.',
+    inputSchema: {
+      pack_id: z.string().uuid().optional(),
+      version: z.number().int().min(1).optional().describe('An older uploaded version, to read. It is written beside the current one, not over it.'),
+      from_line: z.number().int().min(1).optional().describe('Continue a memory longer than one answer, from memory_next_line.'),
+    },
+  }, guarded(async (a) => {
+    const api = apiFromConfig();
+    if (api) { const g = await humanGuard(api); if (g) return g; }
+    if (!a.pack_id) return ok({ ...(await listPacks(api)), folder: memoryRoot(), next: 'Call load_memory with a pack_id.' });
+    const m = await loadMemory(api, a.pack_id, a.version);
+    const shown = pageLines(memoryBody(m.doc), a.from_line ?? 1, MEMORY_ECHO_TOKENS);
+    return ok({
+      pack_id: m.pack_id, title: m.title, version: m.version, source: m.source, path: m.path,
+      memory: shown.text,
+      ...(shown.next_line ? { memory_next_line: shown.next_line } : {}),
+      ...(m.kept_local ? { kept_local: m.kept_local, kept_local_note: 'The copy on this machine differed from the server\'s and was kept at this path; if it holds work the server copy lacks, merge it into the next save.' } : {}),
+      rule: DATA_NOT_INSTRUCTIONS,
+      next: shown.next_line
+        ? `Continue with load_memory(pack_id, from_line: ${shown.next_line}).`
+        : 'Work from the memory; open an anchor (hash#tA-B) with read_restored when a line is not enough. To refresh it, call fetch_memory_sources with this pack_id.',
     });
   }));
 

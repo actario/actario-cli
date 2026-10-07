@@ -2,7 +2,9 @@ import { createReadStream } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type {
-  AnalysisSubmitResponse, BundleMeta, CaptureReport, ManifestFile, MeResponse, SourceCreate, SourceDto, UploadStatusResponse, UploadsInitResponse,
+  AnalysisSubmitResponse, BundleMeta, CaptureReport, ManifestFile, MeResponse, MemoryPackResponse, MemoryPackSave, MemoryPackSaved,
+  MemoryPacksResponse, MemorySourcesResponse, RunsResponse, SourceCreate, SourceDto, TranscriptInclude, TranscriptResponse,
+  UploadStatusResponse, UploadsInitResponse,
 } from '@distill/shared';
 import { DistillError, logger, type ErrorCode } from '@distill/shared';
 
@@ -234,3 +236,49 @@ export const createSource = (opts: ApiOptions, body: SourceCreate): Promise<Sour
 /** One-way: general -> medical only, like the server. */
 export const patchSource = (opts: ApiOptions, id: string, body: { profile?: 'medical'; label?: string | null }): Promise<SourceDto> =>
   request<SourceDto>(opts, `/api/v1/sources/${id}`, { method: 'PATCH', body: JSON.stringify(body), attempts: 1 });
+
+// ── restore and memory (arch v2.1 ch. 22, CLI 0.1.4) ──
+
+/** `?a=1&b=x`, skipping undefined, null and empty values. */
+const qs = (params: Record<string, string | number | undefined | null>): string => {
+  const u = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== '') u.set(k, String(v));
+  const s = u.toString();
+  return s ? `?${s}` : '';
+};
+
+/** GET /runs -- runs this person can bring back, newest first. */
+export const findRunsApi = (
+  opts: ApiOptions, q: { q?: string; agent?: string; since?: string; until?: string; limit?: number; cursor?: string },
+): Promise<RunsResponse> =>
+  request<RunsResponse>(opts, `/api/v1/runs${qs(q)}`, { method: 'GET' });
+
+/** GET /runs/{id or run_hash}/transcript -- one page of masked turns. */
+export const getTranscript = (
+  opts: ApiOptions, ref: string, q: { from?: number; limit?: number; include?: TranscriptInclude[] } = {},
+): Promise<TranscriptResponse> =>
+  request<TranscriptResponse>(
+    opts,
+    `/api/v1/runs/${encodeURIComponent(ref)}/transcript${qs({ from: q.from, limit: q.limit, include: q.include?.join(',') })}`,
+    { method: 'GET' },
+  );
+
+/** GET /memory-sources -- the scope resolved to runs, with segments and note pages (no turns). */
+export const getMemorySources = (
+  opts: ApiOptions, q: { runs?: string[]; agent?: string; since?: string; until?: string; limit?: number },
+): Promise<MemorySourcesResponse> =>
+  request<MemorySourcesResponse>(
+    opts,
+    `/api/v1/memory-sources${qs({ runs: q.runs?.join(','), agent: q.agent, since: q.since, until: q.until, limit: q.limit })}`,
+    { method: 'GET' },
+  );
+
+/** POST /memory-packs -- one attempt: a 409 memory_conflict is an answer, not a hiccup. */
+export const saveMemoryPackApi = (opts: ApiOptions, body: MemoryPackSave): Promise<MemoryPackSaved> =>
+  request<MemoryPackSaved>(opts, '/api/v1/memory-packs', { method: 'POST', body: JSON.stringify(body), attempts: 1 });
+
+export const listMemoryPacksApi = (opts: ApiOptions): Promise<MemoryPacksResponse> =>
+  request<MemoryPacksResponse>(opts, '/api/v1/memory-packs', { method: 'GET' });
+
+export const getMemoryPackApi = (opts: ApiOptions, id: string, version?: number): Promise<MemoryPackResponse> =>
+  request<MemoryPackResponse>(opts, `/api/v1/memory-packs/${encodeURIComponent(id)}${qs({ version })}`, { method: 'GET' });

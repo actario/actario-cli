@@ -22,6 +22,7 @@ export const ERROR_CODES = [
   'last_superuser',         // the last platform superuser cannot be removed from the web
   'invitation_invalid',     // the invitation was revoked, accepted or has expired
   'page_conflict',          // the note page was saved by someone else since it was opened: reload, then edit (design 0002)
+  'memory_conflict',        // the memory pack got a newer version since this one was based on it: fetch it, merge, save again (arch v2.1 22.3)
   'plan_required',          // the workspace's plan does not include this (e.g. full export on Free)
   'billing_not_configured', // no billing provider keys on this deployment yet (Stripe not connected)
   // Sign in from Claude (device authorization, RFC 8628 names):
