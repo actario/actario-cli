@@ -1,0 +1,5 @@
+# session log v9 (binary-ish header omitted)
+2026-09-02T04:00:01Z | INIT   | agent=b2 model=unknown
+2026-09-02T04:00:09Z | >>>>>> | reindex the embeddings for project-b
+2026-09-02T04:01:55Z | <<<<<< | 1,204 vectors rebuilt; hnsw index rebuilt in 41s
+2026-09-02T04:02:10Z | EXIT   | code=0

@@ -1,0 +1,4 @@
+SECRET:sk-ant-api03-Zx9mQ2vL8nR4tK7wY1bF6hJ3sD5gA0cE
+---
+Here is my key for the BYOK setting, does the worker pick it up automatically?
+ANTHROPIC_API_KEY=sk-ant-api03-Zx9mQ2vL8nR4tK7wY1bF6hJ3sD5gA0cE

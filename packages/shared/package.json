@@ -1,0 +1,16 @@
+{
+  "name": "@distill/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./contracts": "./src/contracts/index.ts",
+    "./plans": "./src/plans.ts",
+    "./tags": "./src/tags.ts",
+    "./search-query": "./src/search-query.ts"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  }
+}

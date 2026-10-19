@@ -1,0 +1,15 @@
+{
+  "schema": "conv/2027-01",
+  "envelope": {
+    "meta": {"exported_at": "2026-09-01T00:00:00Z", "tenant": "acme"},
+    "conversation": {
+      "id": "deep-1",
+      "thread": {
+        "items": [
+          {"who": {"role": "user"}, "payload": {"text": "can we drop the v2 fallback yet?"}, "when": 1787990000},
+          {"who": {"role": "assistant"}, "payload": {"text": "not until the Korea batch is reprocessed"}, "when": 1787990060}
+        ]
+      }
+    }
+  }
+}

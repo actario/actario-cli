@@ -1,0 +1,5 @@
+SECRET:postgres://distill_app:s3cr3t-p4ssw0rd@db.internal.acme.io:5432/distill
+SECRET:mongodb+srv://ops:Tr0ub4dor3@cluster0.abcde.mongodb.net/prod
+---
+DATABASE_URL=postgres://distill_app:s3cr3t-p4ssw0rd@db.internal.acme.io:5432/distill
+also tried mongodb+srv://ops:Tr0ub4dor3@cluster0.abcde.mongodb.net/prod
